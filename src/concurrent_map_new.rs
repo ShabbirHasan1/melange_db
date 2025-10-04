@@ -93,36 +93,18 @@ impl<K: 'static, V: 'static> ConcurrentMap<K, V> {
         self.inner.remove(key).map(|entry| entry.value().clone())
     }
 
-    /// 获取范围迭代器
-    pub fn range<'a, R, Q>(&'a self, range: R) -> impl Iterator<Item = (K, V)> + 'a
-    where
-        K: Ord + Clone + Borrow<Q> + Send + Sync,
-        V: Clone + Send + Sync,
-        R: RangeBounds<Q> + 'a,
-        Q: Ord + 'a,
-    {
-        self.inner
-            .range(range)
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-    }
-
     /// 获取小于指定键的条目
     pub fn get_lt<Q>(&self, key: &Q) -> Option<(K, V)>
     where
         K: Ord + Clone + Borrow<Q> + Send + Sync,
         V: Clone + Send + Sync,
-        Q: Ord + ?Sized,
+        Q: Ord + Sized,
     {
-        // 简化实现，直接搜索所有元素找到最大的小于key的条目
-        let mut result = None;
-        for entry in self.inner.iter() {
-            if entry.key().borrow() < key {
-                result = Some((entry.key().clone(), entry.value().clone()));
-            } else {
-                break;
-            }
-        }
-        result
+        // 使用crossbeam-skiplist的range方法
+        self.inner
+            .range(..key)
+            .last()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
     }
 
     /// 获取小于等于指定键的条目
@@ -130,10 +112,15 @@ impl<K: 'static, V: 'static> ConcurrentMap<K, V> {
     where
         K: Ord + Clone + Borrow<Q> + Send + Sync,
         V: Clone + Send + Sync,
-        Q: Ord + ?Sized,
+        Q: Ord + Sized + ToOwned<Owned = K>,
     {
-        // 暂时使用get_lt作为替代，后续可以优化
-        self.get_lt(key)
+        // 首先尝试精确匹配
+        if let Some(value) = self.get(key) {
+            Some((key.to_owned(), value))
+        } else {
+            // 没有精确匹配，返回小于key的最大值
+            self.get_lt(key)
+        }
     }
 
     /// 获取最大条目
@@ -161,6 +148,19 @@ impl<K: 'static, V: 'static> ConcurrentMap<K, V> {
         Q: Ord + ?Sized,
     {
         self.inner.contains_key(key)
+    }
+
+    /// 获取范围查询结果（简化实现）
+    pub fn range<R>(&self, range: R) -> Vec<(K, V)>
+    where
+        K: Ord + Clone,
+        V: Clone,
+        R: std::ops::RangeBounds<K>,
+    {
+        self.inner
+            .range(range)
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect::<Vec<(K, V)>>()
     }
 
     /// 手动推进epoch（用于垃圾回收）
@@ -234,7 +234,7 @@ mod tests {
         }
 
         // 测试范围迭代
-        let values: Vec<_> = map.range(3..=7).collect();
+        let values = map.range(3..=7);
         assert_eq!(values, vec![(3, 30), (4, 40), (5, 50), (6, 60), (7, 70)]);
 
         // 测试get_lt

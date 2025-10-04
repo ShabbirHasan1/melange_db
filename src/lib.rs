@@ -14,6 +14,7 @@ pub mod block_cache;
 pub mod bloom_filter;
 pub mod smart_flush;
 mod concurrent_map_new;
+mod radix_tree;
 mod config;
 mod db;
 mod flush_epoch;
@@ -168,8 +169,7 @@ pub type CompareAndSwapResult = std::io::Result<
     std::result::Result<CompareAndSwapSuccess, CompareAndSwapError>,
 >;
 
-type Index<const LEAF_FANOUT: usize> = crate::concurrent_map_new::ConcurrentMap<
-    InlineArray,
+type Index<const LEAF_FANOUT: usize> = crate::radix_tree::InlineArrayRadixMap<
     Object<LEAF_FANOUT>,
 >;
 

@@ -855,7 +855,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         flush_stats.max = flush_stats.max.max(&ret);
         flush_stats.sum = flush_stats.sum.sum(&ret);
 
-        assert_eq!(self.dirty.range(..flush_boundary).count(), 0);
+        assert_eq!(self.dirty.range(..flush_boundary).len(), 0);
 
         Ok(ret)
     }

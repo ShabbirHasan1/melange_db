@@ -250,7 +250,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
             let _heap_pin = self.cache.heap_object_id_pin();
 
-            let (low_key, node) = self.index.get_lte(key).unwrap();
+            let (low_key, node) = self.index.get_lte_from_bytes(key).unwrap();
             if node.collection_id != self.collection_id {
                 trace_log!("retry due to mismatched collection id in page_in");
 
@@ -586,7 +586,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         key: &[u8],
     ) -> io::Result<LeafReadGuard<'a, LEAF_FANOUT>> {
                       loop {
-            let (low_key, node) = self.index.get_lte(key).unwrap();
+            let (low_key, node) = self.index.get_lte_from_bytes(key).unwrap();
 
                         let mut read = node.inner.read_arc();
 
@@ -2026,8 +2026,7 @@ impl<const LEAF_FANOUT: usize> DoubleEndedIterator for Iter<LEAF_FANOUT> {
                 }
                 self.inner
                     .index
-                    .range::<std::ops::RangeTo<_>, InlineArray>(..last)
-                    .last()
+                    .get_lt(last)
                     .unwrap()
                     .0
             } else {
