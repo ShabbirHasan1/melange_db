@@ -50,18 +50,19 @@ fn get_next_id(db: &Db, sequence_name: &str) -> Result<u64, Box<dyn std::error::
 fn test_concurrent(db: Arc<Db>) -> Result<(), Box<dyn std::error::Error>> {
     let mut handles = vec![];
 
-    // 启动多个线程同时获取ID
-    for _ in 0..3 {
+    // 启动多个线程同时获取ID - 测试16线程
+    for thread_id in 0..16 {
         let db_clone = Arc::clone(&db);
         let handle = thread::spawn(move || -> Vec<u64> {
             let mut ids = vec![];
-            for _ in 0..5 {
+            for _ in 0..10 {  // 每个线程获取10个ID，总共160个ID
                 if let Ok(id) = get_next_id(&*db_clone, "concurrent_test") {
                     ids.push(id);
                 }
                 // 添加小延迟避免过于激烈的竞争
                 std::thread::sleep(std::time::Duration::from_millis(1));
             }
+            println!("线程 {} 获取了 {} 个ID", thread_id, ids.len());
             ids
         });
         handles.push(handle);
