@@ -164,3 +164,7 @@ impl Drop for DeferredFree {
         self.allocator.free(self.freed_slot)
     }
 }
+
+// 为crossbeam-epoch添加必要的trait实现
+unsafe impl Send for DeferredFree {}
+unsafe impl Sync for DeferredFree {}

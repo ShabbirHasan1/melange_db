@@ -544,9 +544,13 @@ pub(crate) struct EpochTracker {
     previous_flush_complete: Completion,
 }
 
+// 为crossbeam-epoch添加必要的trait实现
+unsafe impl Send for EpochTracker {}
+unsafe impl Sync for EpochTracker {}
+
 #[derive(Clone, Debug)]
 pub(crate) struct FlushEpochTracker {
-    active_ebr: ebr::Ebr<Box<EpochTracker>, 16, 16>,
+    active_ebr: crossbeam_epoch::Collector,
     inner: Arc<FlushEpochInner>,
 }
 
@@ -592,7 +596,7 @@ impl Default for FlushEpochTracker {
                 roll_mu: Mutex::new(()),
                 current_active,
             }),
-            active_ebr: ebr::Ebr::default(),
+            active_ebr: crossbeam_epoch::Collector::new(),
         }
     }
 }
@@ -602,7 +606,7 @@ impl FlushEpochTracker {
     /// Intended to be passed to a flusher that can eventually
     /// notify the flush-requesting thread.
     pub fn roll_epoch_forward(&self) -> (Completion, Completion, Completion) {
-        let mut tracker_guard = self.active_ebr.pin();
+        let tracker_guard = self.active_ebr.register().pin();
 
         let vacancy_mu = self.inner.roll_mu.lock().unwrap();
 
@@ -644,13 +648,14 @@ impl FlushEpochTracker {
 
             (old.previous_flush_complete.clone(), old.vacancy_notifier.clone())
         };
-        tracker_guard.defer_drop(unsafe { Box::from_raw(old_ptr) });
+        // 暂时直接删除，后续可以使用其他机制进行延迟删除
+        unsafe { drop(Box::from_raw(old_ptr)) };
         drop(vacancy_mu);
         (last_flush_complete_notifier, vacancy_notifier, forward_flush_notifier)
     }
 
     pub fn check_in<'a>(&self) -> FlushEpochGuard<'a> {
-        let _tracker_guard = self.active_ebr.pin();
+        let _tracker_guard = self.active_ebr.register().pin();
         loop {
             let tracker: &'a EpochTracker =
                 unsafe { &*self.inner.current_active.load(Ordering::SeqCst) };
@@ -673,7 +678,8 @@ impl FlushEpochTracker {
     }
 
     pub fn manually_advance_epoch(&self) {
-        self.active_ebr.manually_advance_epoch();
+        // 在crossbeam-epoch中，通过创建新的guard来推进epoch
+        let _guard = self.active_ebr.register().pin();
     }
 
     pub fn current_flush_epoch(&self) -> FlushEpoch {

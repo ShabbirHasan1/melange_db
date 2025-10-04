@@ -141,16 +141,14 @@ pub(crate) struct ReadStatTracker {
 pub struct ObjectCache<const LEAF_FANOUT: usize> {
     pub config: Config,
     global_error: Arc<AtomicPtr<(io::ErrorKind, String)>>,
-    pub object_id_index: ConcurrentMap<
+    pub object_id_index: crate::concurrent_map_new::ConcurrentMap<
         ObjectId,
         Object<LEAF_FANOUT>,
-        INDEX_FANOUT,
-        EBR_LOCAL_GC_BUFFER_SIZE,
     >,
     heap: Heap,
     cache_advisor: RwLock<CacheAdvisor>,
     flush_epoch: FlushEpochTracker,
-    dirty: ConcurrentMap<(FlushEpoch, ObjectId), Dirty<LEAF_FANOUT>, 4>,
+    dirty: crate::concurrent_map_new::ConcurrentMap<(FlushEpoch, ObjectId), Dirty<LEAF_FANOUT>>,
     compacted_heap_slots: Arc<AtomicU64>,
     pub(super) tree_leaves_merged: Arc<AtomicU64>,
         invariants: Arc<FlushInvariants>,
@@ -511,7 +509,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         Ok(())
     }
 
-    pub fn heap_object_id_pin(&self) -> ebr::Guard<'_, DeferredFree, 16, 16> {
+    pub fn heap_object_id_pin(&self) -> crossbeam_epoch::Guard {
         self.heap.heap_object_id_pin()
     }
 
@@ -867,22 +865,18 @@ fn initialize<const LEAF_FANOUT: usize>(
     recovered_nodes: &[ObjectRecovery],
     heap: &Heap,
 ) -> (
-    ConcurrentMap<
+    crate::concurrent_map_new::ConcurrentMap<
         ObjectId,
         Object<LEAF_FANOUT>,
-        INDEX_FANOUT,
-        EBR_LOCAL_GC_BUFFER_SIZE,
     >,
     HashMap<CollectionId, Index<LEAF_FANOUT>>,
 ) {
     let mut trees: HashMap<CollectionId, Index<LEAF_FANOUT>> = HashMap::new();
 
-    let object_id_index: ConcurrentMap<
+    let object_id_index: crate::concurrent_map_new::ConcurrentMap<
         ObjectId,
         Object<LEAF_FANOUT>,
-        INDEX_FANOUT,
-        EBR_LOCAL_GC_BUFFER_SIZE,
-    > = ConcurrentMap::default();
+    > = crate::concurrent_map_new::ConcurrentMap::default();
 
     for ObjectRecovery { object_id, collection_id, low_key } in recovered_nodes
     {

@@ -2026,8 +2026,8 @@ impl<const LEAF_FANOUT: usize> DoubleEndedIterator for Iter<LEAF_FANOUT> {
                 }
                 self.inner
                     .index
-                    .range::<InlineArray, _>(..last)
-                    .next_back()
+                    .range::<std::ops::RangeTo<_>, InlineArray>(..last)
+                    .last()
                     .unwrap()
                     .0
             } else {

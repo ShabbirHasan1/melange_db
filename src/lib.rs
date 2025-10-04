@@ -13,6 +13,7 @@
 pub mod block_cache;
 pub mod bloom_filter;
 pub mod smart_flush;
+mod concurrent_map_new;
 mod config;
 mod db;
 mod flush_epoch;
@@ -167,11 +168,9 @@ pub type CompareAndSwapResult = std::io::Result<
     std::result::Result<CompareAndSwapSuccess, CompareAndSwapError>,
 >;
 
-type Index<const LEAF_FANOUT: usize> = concurrent_map::ConcurrentMap<
+type Index<const LEAF_FANOUT: usize> = crate::concurrent_map_new::ConcurrentMap<
     InlineArray,
     Object<LEAF_FANOUT>,
-    INDEX_FANOUT,
-    EBR_LOCAL_GC_BUFFER_SIZE,
 >;
 
 /// 比较并交换错误
