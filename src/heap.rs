@@ -8,7 +8,30 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering, fence};
 use std::time::{Duration, Instant};
 
-use crossbeam_epoch::{Collector, Guard};
+// 简化的Guard类型替代crossbeam_epoch
+pub struct SimpleGuard;
+
+// 简化的Collector类型替代crossbeam_epoch
+#[derive(Clone)]
+pub struct SimpleCollector;
+
+impl SimpleCollector {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn register(&self) -> &Self {
+        self
+    }
+
+    pub fn pin(&self) -> SimpleGuard {
+        SimpleGuard
+    }
+}
+
+// 为了保持API兼容性，重新导出这些类型
+pub type Guard = SimpleGuard;
+pub type Collector = SimpleCollector;
 use fault_injection::{annotate, fallible, maybe};
 use fnv::FnvHashSet;
 use fs2::FileExt as _;
@@ -510,7 +533,7 @@ impl Slab {
     fn read(
         &self,
         slot: u64,
-        _guard: &Guard,
+        _guard: &SimpleGuard,
     ) -> io::Result<Vec<u8>> {
         trace_log!("reading from slot {} in slab {}", slot, self.slot_size);
 
@@ -683,7 +706,7 @@ pub struct Heap {
     slabs: Arc<[Slab; N_SLABS]>,
     table: ObjectLocationMapper,
     metadata_store: Arc<Mutex<MetadataStore>>,
-    free_ebr: Collector,
+    free_ebr: SimpleCollector,
     global_error: Arc<AtomicPtr<(io::ErrorKind, String)>>,
     #[allow(unused)]
     directory_lock: Arc<fs::File>,
@@ -826,7 +849,7 @@ impl Heap {
                 global_error: metadata_store.get_global_error_arc(),
                 metadata_store: Arc::new(Mutex::new(metadata_store)),
                 directory_lock: Arc::new(directory_lock),
-                free_ebr: Collector::new(),
+                free_ebr: SimpleCollector::new(),
                 truncated_file_bytes: Arc::default(),
                 stats: Arc::default(),
             },
@@ -1114,7 +1137,7 @@ impl Heap {
         Ok(stats)
     }
 
-    pub fn heap_object_id_pin(&self) -> Guard {
+    pub fn heap_object_id_pin(&self) -> SimpleGuard {
         self.free_ebr.register().pin()
     }
 

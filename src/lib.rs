@@ -13,12 +13,12 @@
 pub mod block_cache;
 pub mod bloom_filter;
 pub mod smart_flush;
-mod concurrent_map_new;
 mod radix_tree;
 mod config;
 mod db;
 mod flush_epoch;
 mod heap;
+mod simple_epoch;
 mod id_allocator;
 mod leaf;
 mod logging;

@@ -174,20 +174,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let start = Instant::now();
 
+        println!("启动8个并发线程...");
         // 利用M1的8核心设计
         for thread_id in 0..8 {
             let db_clone = db_clone.clone();
+            println!("启动线程 {}", thread_id);
             let handle = thread::spawn(move || {
                 let tree = db_clone.open_tree("concurrent_test")?;
+                println!("线程 {} 开始插入数据", thread_id);
                 for i in 0..1000 {
                     let key = format!("m1_lz4_concurrent_key_{}_{}", thread_id, i);
                     let value = format!("lz4_m1_concurrent_value_{}_{}", thread_id, i);
+                    if i % 100 == 0 {
+                        println!("线程 {} 已完成 {} 次插入", thread_id, i);
+                    }
                     tree.insert(key.as_bytes(), value.as_bytes())?;
                 }
+                println!("线程 {} 完成1000次插入", thread_id);
                 Ok::<(), std::io::Error>(())
             });
             handles.push(handle);
         }
+
+        println!("等待所有线程完成...");
 
         for handle in handles {
             handle.join().unwrap()?;
